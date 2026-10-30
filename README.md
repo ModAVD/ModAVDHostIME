@@ -9,6 +9,8 @@
 - 旧模拟器没有这个服务时不崩、不忙等：连不上就按 1 s、2 s、4 s…封顶 30 s 退避重连。
 - 不申请任何权限，不存任何数据。minSdk 30、targetSdk 34。许可 AGPL-3.0-or-later。
 
+使用说明和参与开发的说明在 ModAVD 文档站：[宿主输入法](https://modavd.github.io/components/ime)、[开发：宿主输入法](https://modavd.github.io/develop/ime)。
+
 ## 要求
 
 - **ModAVD 0.35.0 或更新**：这一版起模拟器才有 `modavd_ime` 通道。更旧的模拟器上装了也不起作用（只在后台退避重连）。
@@ -148,6 +150,7 @@ am start -n org.modavd.ime.testapp/.MainActivity [--es focus text|password|raw] 
 - 新加或修改 workflow：第三方 action 钉到 40 位提交 SHA，不用 `pull_request_target`，不用自托管 runner。
 - 其余约定（署名、许可、AI 工具、安全问题怎么报）和 ModAVD 一样，见 ModAVD 的
   [CONTRIBUTING.md](https://github.com/ModAVD/ModAVD/blob/main/CONTRIBUTING.md)。
+- 环境、硬件、怎么验证和用 AI 工具时的模型建议，见文档站的[开发：宿主输入法](https://modavd.github.io/develop/ime)。
 
 ## 许可证
 
