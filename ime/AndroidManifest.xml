@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright 2026 qiyinxi
+  SPDX-License-Identifier: AGPL-3.0-or-later (https://www.gnu.org/licenses/agpl-3.0.html)
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.modavd.ime"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <!-- 编译用 android-36 的 android.jar，但只用 API 34 及以下的接口；不申请任何权限 -->
+    <uses-sdk android:minSdkVersion="30" android:targetSdkVersion="34" />
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/ime_name">
+        <service
+            android:name=".HostImeService"
+            android:exported="true"
+            android:label="@string/ime_name"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
+        </service>
+    </application>
+</manifest>

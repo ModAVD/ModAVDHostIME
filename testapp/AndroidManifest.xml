@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright 2026 qiyinxi
+  SPDX-License-Identifier: AGPL-3.0-or-later (https://www.gnu.org/licenses/agpl-3.0.html)
+-->
+<!-- 测试用，不随产品分发 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.modavd.ime.testapp"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <uses-sdk android:minSdkVersion="30" android:targetSdkVersion="34" />
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name">
+        <!-- singleTask：已在前台时再 am start 也走 onNewIntent，focus / clear 照样生效 -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

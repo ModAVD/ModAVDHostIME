@@ -1,0 +1,17 @@
+ModAVDHostIME (org.modavd.ime)
+Copyright 2026 qiyinxi
+
+Licensed under the GNU Affero General Public License, version 3 or (at your
+option) any later version (SPDX-License-Identifier: AGPL-3.0-or-later); see
+the LICENSE file.
+
+This repository contains no third-party code.
+
+The Android SDK's android.jar (platforms;android-36) is used only at compile
+time, as the library the code is compiled and linked against. It is not part
+of this repository and is not included in the built APKs.
+
+---
+
+ModAVDHostIME（org.modavd.ime），Copyright 2026 qiyinxi，按 GNU Affero General Public License 第 3 版或（由你选择）任何更新的版本授权（AGPL-3.0-or-later），见 LICENSE。
+本仓库不含第三方代码。Android SDK 的 android.jar（platforms;android-36）只在编译时用，不在本仓库里，也不进编出的 APK。
