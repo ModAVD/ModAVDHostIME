@@ -16,7 +16,37 @@
 - **ModAVD 0.35.0 或更新**：这一版起模拟器才有 `modavd_ime` 通道。更旧的模拟器上装了也不起作用（只在后台退避重连）。
 - 客体 Android 11（API 30）以上；ModAVD 现用的是 Android 14 镜像。
 
-## 随 ModAVD 分发
+## 版本和独立发布
+
+本仓库是 ModAVD 宿主输入法的公开来源和独立发布仓库。版本 tag 使用 `v1.x.y`，APK 的
+`versionName` 与 tag 的数字部分相同；v1.0.0 是历史兼容例外，保持 `versionName 1.0`、
+`versionCode 1`。以后 APK 内容改变时 `versionCode` 加一。
+
+ModAVD 整包仍会带着 `components\modavd-ime.apk`，并在发布时钉住它的 SHA-256。管理器的安装规则是：
+没有安装、包的 `versionCode` 更新、或版本号相同但 `base.apk` SHA-256 不同就安装；签名不同先卸载再装，
+从不降级。读不出客体 APK 哈希时，同版本号视为已是最新。自己编的 APK 必须使用高于官方包的
+`versionCode`，否则开机时会被官方版本换回。
+
+第一个独立版本 [v1.0.0](https://github.com/ModAVD/ModAVDHostIME/releases/tag/v1.0.0) 与 ModAVD
+0.36.0 包中的 `components\modavd-ime.apk` 逐字节相同。正式发布前由维护者在本机用正式密钥签名，
+再手动触发 `verify-release` workflow；CI 用一次性 RSA-4096 密钥重签构建产物，只比较签名块以外的
+条目区和中央目录，并核对发布证书。
+
+### CI 和发布
+
+`ci.yml` 只在 Pull Request 或手动触发时运行协议自测、Windows APK 构建、隐私扫描和作者检查。
+构建使用固定的 Temurin 25.0.4.1+1、Android SDK build-tools 36.1.0 和 android-36；正式密钥不进
+CI。发布流程见 [release/1.0.0.md](release/1.0.0.md)、`scripts/release-local.ps1` 和
+`verify-release.yml`。用户本机创建草稿的典型命令是：
+
+```powershell
+pwsh -NoProfile -File .\scripts\release-local.ps1 -Tag v1.0.0 `
+  -UseExistingApk <冻结的 modavd-ime.apk 路径>
+```
+
+首次以后的版本由 tag 源码重新构建，并由脚本生成 Release 附件 `SHA256SUMS.txt`；是否把它事后补进
+仓库由维护者决定。核对发布 APK 时，使用 `verify-release` workflow 或仓库里的
+`scripts/verify_release_apk.py`，不要直接拿未签名的 `aligned.apk` 比较。
 
 ModAVD 0.36.0 起，发布包里带 `components\modavd-ime.apk`，ModAVD 管理器每次开机自动处理：
 
@@ -68,6 +98,10 @@ pwsh -NoProfile -File .\build.ps1
 - 自己打算分发 APK 的话：**APK 一旦发出去，签名密钥就不能换**（安卓拒绝用不同密钥签的包覆盖安装），发之前定好用哪把密钥并备份。
 - **密钥绝不进 git**：`out/`、`*.p12`、`*.pass` 都在 `.gitignore` 里。
 - 代码只用 API 34 及以下的接口；编译用 android-36 的 `android.jar`，它只在编译时用，不进 APK。
+
+v1.0.0 为了逐字节复现历史 APK，构建时仍依赖本地时区；CI 的 APK job 使用 `TZ=CET-1`。以后改 APK
+时要在构建里固定 ZIP 条目时间并去掉这个依赖，同时把 `versionCode` 加一、`versionName` 改成新的
+`1.x.y`（例如 `1.1.0`）。
 
 只跑协议自测（任何系统都行，只要 JDK 17 以上）：
 

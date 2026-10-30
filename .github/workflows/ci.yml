@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Temurin 25.0.4.1+1
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '25.0.4+1.1'
+      - name: Assert JDK version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(java -version 2>&1)"
+          printf '%s\n' "$version"
+          grep -F '25.0.4.1+1' <<<"$version"
+      - name: Compile and run ProtocolTest
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/prototest"
+          javac --release 17 -encoding UTF-8 -Xlint:all -Werror -d "$out" \
+            ime/src/org/modavd/ime/HostProtocol.java ime/test/ProtocolTest.java
+          java -cp "$out" org.modavd.ime.ProtocolTest
+
+  apk-build:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - name: Checkout without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Temurin 25.0.4.1+1
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '25.0.4+1.1'
+      - name: Assert JDK version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (& java -version 2>&1 | Out-String)
+          $version
+          if ($version -notmatch '25\.0\.4\.1\+1') { throw "需要 Temurin 25.0.4.1+1，实际是：$version" }
+      - name: Check android.jar and build APKs
+        shell: pwsh
+        env:
+          TZ: CET-1
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $jar = Join-Path $env:ANDROID_HOME 'platforms\android-36\android.jar'
+          if (-not (Test-Path -LiteralPath $jar -PathType Leaf)) { throw "找不到 $jar" }
+          $hash = (Get-FileHash -LiteralPath $jar -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne 'd9eb9da824d9e247a352f570f01e1169e725b2954bca9e283a71786c59b59f9a') {
+            throw "android.jar SHA-256 不符：$hash"
+          }
+          pwsh -NoProfile -File .\build.ps1 -BuildTools (Join-Path $env:ANDROID_HOME 'build-tools\36.1.0') -AndroidJar $jar
+
+  privacy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Scan tracked files for private data
+        shell: bash
+        run: python -B -I -X utf8 scripts/privacy.py . --allowlist scripts/privacy-allowlist.json
+
+  authors:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CHECK_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+      CHECK_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      CHECK_MANUAL: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
+    steps:
+      - name: Checkout full history without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run repo checks unit tests
+        shell: bash
+        run: python -B -I -X utf8 -m unittest scripts.test_repo_checks -v
+      - name: Check commit authors and trailers
+        shell: bash
+        run: python -B -I -X utf8 scripts/repo_checks.py
