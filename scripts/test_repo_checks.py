@@ -1,6 +1,10 @@
+from pathlib import Path
+import sys
 import unittest
 
-from scripts import repo_checks
+# CI runs this file with python -I, which leaves the script directory off sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import repo_checks  # noqa: E402
 
 
 class RepoChecksTest(unittest.TestCase):
