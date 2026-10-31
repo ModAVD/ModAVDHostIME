@@ -1,0 +1,125 @@
+name: Verify release APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag whose draft release should be checked (for example v1.0.0)
+        required: true
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-release:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+    steps:
+      - name: Validate tag input
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG_INPUT" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "非法 tag：$TAG_INPUT" >&2
+            exit 1
+          fi
+      - name: Download release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/release-assets"
+          gh release download "$TAG_INPUT" --repo "$GITHUB_REPOSITORY" \
+            --pattern modavd-ime.apk --pattern SHA256SUMS.txt \
+            --dir "$RUNNER_TEMP/release-assets"
+      - name: Upload release assets for read-only job
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-assets
+          path: ${{ runner.temp }}/release-assets
+          if-no-files-found: error
+
+  verify:
+    needs: fetch-release
+    runs-on: windows-2025
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      TAG_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+    steps:
+      - name: Validate tag input
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:TAG_INPUT -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw "非法 tag：$env:TAG_INPUT" }
+      - name: Checkout tag without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG_INPUT }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Temurin 25.0.4.1+1
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '25.0.4+1.1'
+      - name: Assert JDK version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (& java -version 2>&1 | Out-String)
+          $version
+          if ($version -notmatch '25\.0\.4\.1\+1') { throw "需要 Temurin 25.0.4.1+1，实际是：$version" }
+      - name: Build unsigned APK with the historical timezone
+        shell: pwsh
+        env:
+          TZ: CET-1
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $jar = Join-Path $env:ANDROID_HOME 'platforms\android-36\android.jar'
+          $hash = (Get-FileHash -LiteralPath $jar -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne 'd9eb9da824d9e247a352f570f01e1169e725b2954bca9e283a71786c59b59f9a') { throw "android.jar SHA-256 不符：$hash" }
+          pwsh -NoProfile -File .\build.ps1 -BuildTools (Join-Path $env:ANDROID_HOME 'build-tools\36.1.0') -AndroidJar $jar
+      - name: Sign the build with a one-time RSA-4096 key
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = Join-Path $env:RUNNER_TEMP 'verify-release-key'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $pass = Join-Path $dir 'pass.txt'
+          Set-Content -LiteralPath $pass -Value 'temporary-ci-password' -NoNewline -Encoding ascii
+          $ks = Join-Path $dir 'temporary-ci.p12'
+          & (Join-Path $env:JAVA_HOME 'bin\keytool.exe') -genkeypair -noprompt -keystore $ks -storetype PKCS12 -alias ci -keyalg RSA -keysize 4096 -validity 1 -dname 'CN=Temporary CI' -storepass:file $pass -keypass:file $pass
+          $apksigner = Join-Path $env:ANDROID_HOME 'build-tools\36.1.0\apksigner.bat'
+          $aligned = Join-Path $PWD 'out\obj\ime\aligned.apk'
+          $signed = Join-Path $dir 'ci-signed.apk'
+          & $apksigner sign --ks $ks --ks-type PKCS12 --ks-key-alias ci --ks-pass "file:$pass" --v1-signing-enabled false --v2-signing-enabled true --v3-signing-enabled true --v4-signing-enabled false --out $signed $aligned
+          "BUILT_SIGNED=$signed" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "APKSIGNER=$apksigner" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "KEYTOOL=$(Join-Path $env:JAVA_HOME 'bin\keytool.exe')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Download release assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v5.0.0
+        with:
+          name: release-assets
+          path: ${{ runner.temp }}/release-assets
+      - name: Check release checksum and APK provenance
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $asset = Join-Path $env:RUNNER_TEMP 'release-assets\modavd-ime.apk'
+          $sums = Join-Path $env:RUNNER_TEMP 'release-assets\SHA256SUMS.txt'
+          $expected = ((Get-Content -LiteralPath $sums | Where-Object { $_ -match '\smodavd-ime\.apk$' } | Select-Object -First 1) -split '\s+')[0].ToLowerInvariant()
+          $actual = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($expected -ne $actual) { throw "Release SHA256SUMS 不符：$expected != $actual" }
+          python -B -I -X utf8 -m unittest scripts.test_verify_release_apk -v
+          python -B -I -X utf8 scripts/verify_release_apk.py --built-apk $env:BUILT_SIGNED --release-apk $asset --apksigner $env:APKSIGNER --certificate-sha256 d18cca3c1982149349f164d28e02490b2eb694e44d56834fa02a1062eb42e823
