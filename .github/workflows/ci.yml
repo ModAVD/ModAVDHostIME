@@ -81,7 +81,7 @@ jobs:
           persist-credentials: false
       - name: Scan tracked files for private data
         shell: bash
-        run: python -B -I -X utf8 scripts/privacy.py . --allowlist scripts/privacy-allowlist.json
+        run: python3 -B -I -X utf8 scripts/privacy.py . --allowlist scripts/privacy-allowlist.json
 
   authors:
     runs-on: ubuntu-24.04
@@ -98,7 +98,7 @@ jobs:
           persist-credentials: false
       - name: Run repo checks unit tests
         shell: bash
-        run: python -B -I -X utf8 -m unittest scripts.test_repo_checks -v
+        run: python3 -B -I -X utf8 scripts/test_repo_checks.py -v
       - name: Check commit authors and trailers
         shell: bash
-        run: python -B -I -X utf8 scripts/repo_checks.py
+        run: python3 -B -I -X utf8 scripts/repo_checks.py

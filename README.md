@@ -16,46 +16,63 @@
 - **ModAVD 0.35.0 或更新**：这一版起模拟器才有 `modavd_ime` 通道。更旧的模拟器上装了也不起作用（只在后台退避重连）。
 - 客体 Android 11（API 30）以上；ModAVD 现用的是 Android 14 镜像。
 
-## 版本和独立发布
+## 版本
 
-本仓库是 ModAVD 宿主输入法的公开来源和独立发布仓库。版本 tag 使用 `v1.x.y`，APK 的
-`versionName` 与 tag 的数字部分相同；v1.0.0 是历史兼容例外，保持 `versionName 1.0`、
-`versionCode 1`。以后 APK 内容改变时 `versionCode` 加一。
+宿主输入法以本仓库为准：在这里开发，单独编号，单独发 GitHub Release。
 
-ModAVD 整包仍会带着 `components\modavd-ime.apk`，并在发布时钉住它的 SHA-256。管理器的安装规则是：
-没有安装、包的 `versionCode` 更新、或版本号相同但 `base.apk` SHA-256 不同就安装；签名不同先卸载再装，
-从不降级。读不出客体 APK 哈希时，同版本号视为已是最新。自己编的 APK 必须使用高于官方包的
-`versionCode`，否则开机时会被官方版本换回。
+- tag 用 `v1.x.y`，APK 的 `versionName` 写成同样的 `1.x.y`。只有 v1.0.0 例外，保持 `versionName 1.0`、`versionCode 1`。
+- APK 内容一变，`versionCode` 就加一。
+- 第一个独立版本 [v1.0.0](https://github.com/ModAVD/ModAVDHostIME/releases/tag/v1.0.0) 和 ModAVD 0.36.0 包里的
+  `components\modavd-ime.apk` 逐字节相同。
 
-第一个独立版本 [v1.0.0](https://github.com/ModAVD/ModAVDHostIME/releases/tag/v1.0.0) 与 ModAVD
-0.36.0 包中的 `components\modavd-ime.apk` 逐字节相同。正式发布前由维护者在本机用正式密钥签名，
-再手动触发 `verify-release` workflow；CI 用一次性 RSA-4096 密钥重签构建产物，只比较签名块以外的
-条目区和中央目录，并核对发布证书。
+## 随 ModAVD 分发
 
-### CI 和发布
-
-`ci.yml` 只在 Pull Request 或手动触发时运行协议自测、Windows APK 构建、隐私扫描和作者检查。
-构建使用固定的 Temurin 25.0.4.1+1、Android SDK build-tools 36.1.0 和 android-36；正式密钥不进
-CI。发布流程见 [release/1.0.0.md](release/1.0.0.md)、`scripts/release-local.ps1` 和
-`verify-release.yml`。用户本机创建草稿的典型命令是：
-
-```powershell
-pwsh -NoProfile -File .\scripts\release-local.ps1 -Tag v1.0.0 `
-  -UseExistingApk <冻结的 modavd-ime.apk 路径>
-```
-
-首次以后的版本由 tag 源码重新构建，并由脚本生成 Release 附件 `SHA256SUMS.txt`；是否把它事后补进
-仓库由维护者决定。核对发布 APK 时，使用 `verify-release` workflow 或仓库里的
-`scripts/verify_release_apk.py`，不要直接拿未签名的 `aligned.apk` 比较。
-
-ModAVD 0.36.0 起，发布包里带 `components\modavd-ime.apk`，ModAVD 管理器每次开机自动处理：
+ModAVD 发布包照旧带着 `components\modavd-ime.apk`，ModAVD 发版时钉住它的 SHA-256。ModAVD 0.36.0 起，ModAVD 管理器每次开机自动处理：
 
 - 没装、已装的版本号（`versionCode`）比包里的旧，或版本号相同但内容和包里的不同（`base.apk` 的 SHA-256 不同）时装，不降级；
+  读不出客体里 APK 的哈希时，版本号相同就当作已是最新；
 - 新装后启用，并在同一份客体数据上只决定一次是否设成默认输入法：当时默认的还是镜像自带的键盘（或没设）才设成它，
   之后你切到别的输入法就不再改回来。
 
 用 ModAVD 的发布包就不需要手动装。包里的 APK 用维护者的密钥签名，证书见下一节。
 要一直用自己编的版本，把 `ime/AndroidManifest.xml` 的 `versionCode` 设得比发布包里的高；不高于它（包括相同）的话，管理器开机时会换回官方版本。
+
+## 发版和核对
+
+正式签名只在维护者本机做，正式密钥不进 CI。所以这里的发版不是「打 tag 自动出包」：
+
+1. 合并、打 tag；
+2. 维护者本机跑 `scripts/release-local.ps1`，建草稿 Release，附件是 `modavd-ime.apk` 和 `SHA256SUMS.txt`；
+3. 手动触发 `verify-release` workflow（输入 tag），证明草稿里的 APK 是从 tag 上的源码编出来的；
+4. 核对通过再发布。发布后附件不能再换，核对要在发布前做完；发布时 `verify-release` 会再跑一遍复核。
+
+`release-local.ps1`：
+
+- 一般的版本：从 tag `git archive` 出源码，用临时开发密钥跑 `build.ps1`，只取未签名的 `out\obj\ime\aligned.apk`，
+  再用正式密钥单独签这一个文件（`-FormalKeyStore`、`-FormalKeyAlias`、`-FormalKeyPassFile`）。密钥库和口令文件不存在就报错，
+  绝不生成新钥。测试 APK 不用正式密钥签。
+- v1.0.0 不重新签名，直接用 0.36.0 包里那份，脚本先核对它等于 [release/1.0.0.SHA256SUMS.txt](release/1.0.0.SHA256SUMS.txt)：
+
+  ```powershell
+  pwsh -NoProfile -File .\scripts\release-local.ps1 -Tag v1.0.0 `
+    -UseExistingApk <0.36.0 包里的 modavd-ime.apk> -BuildTools <SDK 根>\build-tools\36.1.0
+  ```
+
+- 没设 `ANDROID_HOME` 就要用 `-BuildTools` 指定 build-tools（签名、核对证书都要 apksigner）。`-WorkDir` 要给新目录或空目录。
+  `-DryRun` 只打印要执行的 `gh release create`，不调用 gh。
+- `SHA256SUMS.txt` 只有 v1.0.0 预先提交进仓库（它的 APK 在打 tag 之前就有了）。以后的版本只作 Release 附件，不补进仓库：
+  哈希要等打 tag、签名之后才有，发布后附件又不能再换，以 Release 为准。
+
+核对的办法（`verify-release` 就是这么做的，也可以自己照做）：正式签名的 APK 和 CI 编出的不可能逐字节相同，比的是签名以外的部分。
+
+- 用一次性 RSA-4096 密钥给 tag 源码编出的 `aligned.apk` 签名（v1 关，v2、v3 开，v4 关，和正式签名一样）。
+  RSA-4096 的签名块和正式版一样是 8192 字节，换别的长度偏移就对不上。
+- `scripts/verify_release_apk.py` 比较两边签名块之前的全部字节和中央目录，再用 `apksigner` 核对发布的 APK：
+  只有一个签名者、v3 验证通过、证书摘要是下一节的值。
+- 不能直接拿未签名的 `aligned.apk` 比：apksigner 签名时会改写条目对齐，后面条目的偏移都会变。
+
+CI（`ci.yml`）只在 Pull Request 和手动触发时跑：协议自测、在 Windows 上编两个 APK、隐私扫描、提交作者检查。
+构建钉住 Temurin 25.0.4.1+1、build-tools 36.1.0 和 android-36（核对 `android.jar` 的 SHA-256）。
 
 ## 官方 APK 的签名证书
 
@@ -74,6 +91,8 @@ ModAVD 0.36.0 起，发布包里带 `components\modavd-ime.apk`，ModAVD 管理�
 | `testapp/` | 测试 APK `org.modavd.ime.testapp`，不随产品分发 |
 | `docs/protocol-v1.md` | 通道协议 v1 |
 | `build.ps1` | 构建脚本（Windows，pwsh 7.2 以上） |
+| `scripts/` | CI 的隐私扫描、作者检查，发版和核对脚本 |
+| `release/` | 各版本的发布说明；v1.0.0 还有预先提交的 `SHA256SUMS.txt` |
 
 ## 构建
 
