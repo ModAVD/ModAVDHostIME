@@ -65,7 +65,10 @@ if ($UseExistingApk) {
     if ($BuildTools) { $buildArgs += @('-BuildTools', $BuildTools) }
     if ($AndroidJar) { $buildArgs += @('-AndroidJar', $AndroidJar) }
     if ($JavaHome) { $buildArgs += @('-JavaHome', $JavaHome) }
-    Invoke-Checked 'pwsh' $buildArgs
+    # Same TZ as verify-release: aapt add converts the classes.dex entry time with the local time zone.
+    $savedTz = $env:TZ
+    $env:TZ = 'CET-1'
+    try { Invoke-Checked 'pwsh' $buildArgs } finally { $env:TZ = $savedTz }
     $aligned = Join-Path $buildOut 'obj\ime\aligned.apk'
     if (-not (Test-Path -LiteralPath $aligned -PathType Leaf)) { throw "构建没有生成 $aligned" }
     if (-not $BuildTools) {

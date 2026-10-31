@@ -2,11 +2,14 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
 
-from scripts import verify_release_apk as verify
+# CI runs this file with python -I, which leaves the script directory off sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import verify_release_apk as verify  # noqa: E402
 
 
 class VerifyReleaseApkTest(unittest.TestCase):
@@ -35,9 +38,11 @@ class VerifyReleaseApkTest(unittest.TestCase):
             )
         cls.signed_a = root / "a.apk"
         cls.signed_b = root / "b.apk"
+        # The sample manifest is not binary XML, so apksigner cannot read minSdkVersion from it.
         for ks, out in ((cls.keystore_a, cls.signed_a), (cls.keystore_b, cls.signed_b)):
             subprocess.run(
-                [cls.apksigner, "sign", "--ks", str(ks), "--ks-type", "PKCS12", "--ks-key-alias", "test",
+                [cls.apksigner, "sign", "--min-sdk-version", "30",
+                 "--ks", str(ks), "--ks-type", "PKCS12", "--ks-key-alias", "test",
                  "--ks-pass", f"file:{cls.password}", "--v1-signing-enabled", "false",
                  "--v2-signing-enabled", "true", "--v3-signing-enabled", "true", "--v4-signing-enabled", "false",
                  "--out", str(out), str(unsigned)],
@@ -53,16 +58,33 @@ class VerifyReleaseApkTest(unittest.TestCase):
         verify.compare_apks(self.signed_a.read_bytes(), self.signed_b.read_bytes())
 
     def test_signature_block_tamper_is_rejected(self):
-        data = bytearray(self.signed_a.read_bytes())
-        layout = verify.parse_layout(data)
-        data[layout.central_directory - 16] ^= 1
-        with self.assertRaises(ValueError):
-            verify.parse_layout(bytes(data))
+        layout = verify.parse_layout(self.signed_a.read_bytes())
+        # Magic, leading size field, trailing size field.
+        for offset in (layout.central_directory - 16, layout.block_start, layout.central_directory - 24):
+            with self.subTest(offset=offset):
+                data = bytearray(self.signed_a.read_bytes())
+                data[offset] ^= 1
+                with self.assertRaises(ValueError):
+                    verify.parse_layout(bytes(data))
 
     def test_entry_tamper_is_rejected(self):
         data = bytearray(self.signed_b.read_bytes())
+        data[data.index(b"dex\n035")] ^= 1
+        with self.assertRaises(ValueError):
+            verify.compare_apks(self.signed_a.read_bytes(), bytes(data))
+
+    def test_padding_tamper_is_rejected(self):
+        data = bytearray(self.signed_b.read_bytes())
         layout = verify.parse_layout(data)
         data[layout.block_start - 1] ^= 1
+        with self.assertRaises(ValueError):
+            verify.compare_apks(self.signed_a.read_bytes(), bytes(data))
+
+    def test_central_directory_tamper_is_rejected(self):
+        data = bytearray(self.signed_b.read_bytes())
+        layout = verify.parse_layout(data)
+        # First byte of the first central-directory file name.
+        data[layout.central_directory + 46] ^= 1
         with self.assertRaises(ValueError):
             verify.compare_apks(self.signed_a.read_bytes(), bytes(data))
 

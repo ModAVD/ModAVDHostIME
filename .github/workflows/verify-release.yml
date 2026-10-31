@@ -42,7 +42,7 @@ jobs:
             --pattern modavd-ime.apk --pattern SHA256SUMS.txt \
             --dir "$RUNNER_TEMP/release-assets"
       - name: Upload release assets for read-only job
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-assets
           path: ${{ runner.temp }}/release-assets
@@ -99,16 +99,19 @@ jobs:
           $pass = Join-Path $dir 'pass.txt'
           Set-Content -LiteralPath $pass -Value 'temporary-ci-password' -NoNewline -Encoding ascii
           $ks = Join-Path $dir 'temporary-ci.p12'
+          # pwsh does not stop on a native command's exit code; check each one.
           & (Join-Path $env:JAVA_HOME 'bin\keytool.exe') -genkeypair -noprompt -keystore $ks -storetype PKCS12 -alias ci -keyalg RSA -keysize 4096 -validity 1 -dname 'CN=Temporary CI' -storepass:file $pass -keypass:file $pass
+          if ($LASTEXITCODE -ne 0) { throw "keytool 失败（退出码 $LASTEXITCODE）" }
           $apksigner = Join-Path $env:ANDROID_HOME 'build-tools\36.1.0\apksigner.bat'
           $aligned = Join-Path $PWD 'out\obj\ime\aligned.apk'
           $signed = Join-Path $dir 'ci-signed.apk'
           & $apksigner sign --ks $ks --ks-type PKCS12 --ks-key-alias ci --ks-pass "file:$pass" --v1-signing-enabled false --v2-signing-enabled true --v3-signing-enabled true --v4-signing-enabled false --out $signed $aligned
+          if ($LASTEXITCODE -ne 0) { throw "apksigner sign 失败（退出码 $LASTEXITCODE）" }
           "BUILT_SIGNED=$signed" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "APKSIGNER=$apksigner" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "KEYTOOL=$(Join-Path $env:JAVA_HOME 'bin\keytool.exe')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Download release assets
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v5.0.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-assets
           path: ${{ runner.temp }}/release-assets
@@ -121,5 +124,8 @@ jobs:
           $expected = ((Get-Content -LiteralPath $sums | Where-Object { $_ -match '\smodavd-ime\.apk$' } | Select-Object -First 1) -split '\s+')[0].ToLowerInvariant()
           $actual = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($expected -ne $actual) { throw "Release SHA256SUMS 不符：$expected != $actual" }
-          python -B -I -X utf8 -m unittest scripts.test_verify_release_apk -v
+          # pwsh does not stop on a native command's exit code; check each one.
+          python -B -I -X utf8 scripts/test_verify_release_apk.py -v
+          if ($LASTEXITCODE -ne 0) { throw "verify_release_apk 自测失败（退出码 $LASTEXITCODE）" }
           python -B -I -X utf8 scripts/verify_release_apk.py --built-apk $env:BUILT_SIGNED --release-apk $asset --apksigner $env:APKSIGNER --certificate-sha256 d18cca3c1982149349f164d28e02490b2eb694e44d56834fa02a1062eb42e823
+          if ($LASTEXITCODE -ne 0) { throw "发布 APK 核对失败（退出码 $LASTEXITCODE）" }
