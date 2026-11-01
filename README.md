@@ -7,7 +7,7 @@
 - 不显示任何输入界面；**不覆写** `onKeyDown` / `onKeyUp` / `onKeyMultiple` / `onKeyLongPress`，物理按键和
   `adb shell input` 注入照旧直达应用（游戏和自动化都靠这个）。
 - 旧模拟器没有这个服务时不崩、不忙等：连不上就按 1 s、2 s、4 s…封顶 30 s 退避重连。
-- 不申请任何权限，不存任何数据。minSdk 30、targetSdk 34。许可 AGPL-3.0-or-later。
+- 不申请任何权限，也不把输入内容或通道数据持久化到文件；运行日志写入 Android 的 `logcat`（见「日志」）。minSdk 30、targetSdk 34。许可 AGPL-3.0-or-later。
 
 使用说明和参与开发的说明在 ModAVD 文档站：[宿主输入法](https://modavd.github.io/components/ime)、[开发：宿主输入法](https://modavd.github.io/develop/ime)。
 
@@ -80,7 +80,7 @@ CI（`ci.yml`）只在 Pull Request 和手动触发时跑：协议自测、在 W
 - 证书主体 `CN=ModAVD`，RSA 4096。
 - 核对：`apksigner verify --print-certs <apk>`，输出里的 `certificate SHA-256 digest` 要和上面的值一致。
 - 自己编的 APK 用你自己的密钥签名，指纹和上面不同；安卓不允许用不同密钥签的包覆盖安装，换用前要先卸载
-  （`adb -s emulator-<端口> uninstall org.modavd.ime`）再装。ModAVD 管理器遇到签名不同会自动先卸再装（这个输入法不存任何数据）。
+  （`adb -s emulator-<端口> uninstall org.modavd.ime`）再装。ModAVD 管理器遇到签名不同会自动先卸再装（这个输入法不把输入内容或通道数据持久化到文件）。
 
 ## 目录
 
@@ -207,4 +207,4 @@ am start -n org.modavd.ime.testapp/.MainActivity [--es focus text|password|raw] 
 
 ## 许可证
 
-GNU Affero General Public License 第 3 版或更新版本（AGPL-3.0-or-later），和 AUTO-MAS 相同，见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。分发它（改没改都算），或者把改过的版本放到网上给别人用，都要按同样的许可证提供对应源码。
+GNU Affero General Public License 第 3 版或更新版本（AGPL-3.0-or-later），见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。与 AUTO-MAS 使用相同的许可证不表示双方存在正式合作或共同维护关系。分发它（改没改都算），或者把改过的版本放到网上给别人用，都要按同样的许可证提供对应源码。
