@@ -1,5 +1,9 @@
 # ModAVDHostIME：ModAVD 宿主输入法（org.modavd.ime）
 
+**简体中文** | [English](README.en.md)
+
+<!-- README.md 和 README.en.md 逐节对应：改了其中一份，请在同一个 PR 里把另一份也改了。 -->
+
 装在 [ModAVD](https://github.com/ModAVD/ModAVD) 模拟器客体里的无界面输入法，配合模拟器的 goldfish pipe 服务 `modavd_ime`：
 把客体的输入焦点和光标位置告诉模拟器，模拟器窗口在「文字模式」下把 Windows 输入法打出的文字（中文、AltGr 组合键、死键都行）
 和编辑键发回来，由它经 `InputConnection` 交给当前编辑框。`adb emu ime commit <文本>` 也走这条路，供自动化打任意语言。
@@ -201,6 +205,7 @@ am start -n org.modavd.ime.testapp/.MainActivity [--es focus text|password|raw] 
 - 改协议要宿主、客体两边一起改，只能加新类型、不改已有类型的格式，请先在 issue 里讨论。
 - 提交署你自己的名字或化名，邮箱用你的 GitHub noreply 地址（`<编号>+<登录名>@users.noreply.github.com`）。
 - 新加或修改 workflow：第三方 action 钉到 40 位提交 SHA，不用 `pull_request_target`，不用自托管 runner。
+- README 有中文（`README.md`）和英文（`README.en.md`）两份，逐节对应：改了一份，就在同一个 PR 里把另一份也改了；只会写一种语言的，在 PR 里说一声，由维护者补上。
 - 其余约定（署名、许可、AI 工具、安全问题怎么报）和 ModAVD 一样，见 ModAVD 的
   [CONTRIBUTING.md](https://github.com/ModAVD/ModAVD/blob/main/CONTRIBUTING.md)。
 - 环境、硬件、怎么验证和用 AI 工具时的模型建议，见文档站的[开发：宿主输入法](https://modavd.github.io/develop/ime)。
