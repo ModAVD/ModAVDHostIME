@@ -201,7 +201,8 @@ The test APK is signed with the same key as the product APK. It is for testing o
 
 ## Contributing
 
-- There is only one maintainer, and replies may take a few days. Open an issue to discuss before you change anything, and say what you want to change and why. A big PR that was not discussed first may not be merged.
+- Report problems and suggest features in the [Issues](https://github.com/ModAVD/ModAVD/issues) of the ModAVD repository, and pick "Host IME"; this repository only takes PRs.
+- There is only one maintainer, and replies may take a few days. Open an issue in the ModAVD repository to discuss before you change anything, and say what you want to change and why. A big PR that was not discussed first may not be merged.
 - A protocol change needs the host and the guest to change together, and it can only add new types, never change the format of existing ones. Please discuss it in an issue first.
 - Put your own name or a pseudonym on your commits, and use your GitHub noreply address as the email (`<id>+<username>@users.noreply.github.com`).
 - When you add or change a workflow: pin third-party actions to a 40-character commit SHA, do not use `pull_request_target`, and do not use self-hosted runners.

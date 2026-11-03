@@ -201,7 +201,8 @@ am start -n org.modavd.ime.testapp/.MainActivity [--es focus text|password|raw] 
 
 ## 参与
 
-- 只有一个维护者，回复可能要几天。改动前先开 issue 商量，写清要改什么、为什么；没商量过的大 PR 可能不合。
+- 报问题、提建议都到 ModAVD 仓库的 [Issues](https://github.com/ModAVD/ModAVD/issues)，选上「宿主输入法」；本仓库只收 PR。
+- 只有一个维护者，回复可能要几天。改动前先在 ModAVD 仓库开 issue 商量，写清要改什么、为什么；没商量过的大 PR 可能不合。
 - 改协议要宿主、客体两边一起改，只能加新类型、不改已有类型的格式，请先在 issue 里讨论。
 - 提交署你自己的名字或化名，邮箱用你的 GitHub noreply 地址（`<编号>+<登录名>@users.noreply.github.com`）。
 - 新加或修改 workflow：第三方 action 钉到 40 位提交 SHA，不用 `pull_request_target`，不用自托管 runner。
