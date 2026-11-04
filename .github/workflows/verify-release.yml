@@ -86,10 +86,37 @@ jobs:
           TZ: CET-1
         run: |
           $ErrorActionPreference = 'Stop'
+          $expectedJarHash = 'd9eb9da824d9e247a352f570f01e1169e725b2954bca9e283a71786c59b59f9a'
+          # repository2-3.xml: platforms;android-36 r2, SHA-1 2c1a80dd4d9f7d0e6dd336ec603d9b5c55a6f576.
+          # Google publishes SHA-1 only; this SHA-256 was computed after checking it.
+          $archiveName = 'platform-36_r02.zip'
+          $expectedArchiveHash = '37607369a28c5b640b3a7998868d45898ebcb777565a0e85f9acf36f29631d2e'
           $jar = Join-Path $env:ANDROID_HOME 'platforms\android-36\android.jar'
-          $hash = (Get-FileHash -LiteralPath $jar -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($hash -ne 'd9eb9da824d9e247a352f570f01e1169e725b2954bca9e283a71786c59b59f9a') { throw "android.jar SHA-256 不符：$hash" }
-          pwsh -NoProfile -File .\build.ps1 -BuildTools (Join-Path $env:ANDROID_HOME 'build-tools\36.1.0') -AndroidJar $jar
+          $sdkTemp = $null
+          try {
+            if (-not (Test-Path -LiteralPath $jar -PathType Leaf) -or
+                (Get-FileHash -LiteralPath $jar -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedJarHash) {
+              Write-Host '预装 android.jar 缺失或 SHA-256 不符，下载 Android 36 r2。'
+              $sdkTemp = Join-Path $env:RUNNER_TEMP ("android-36-r2-" + [guid]::NewGuid().ToString('N'))
+              New-Item -ItemType Directory -Path $sdkTemp | Out-Null
+              $archive = Join-Path $sdkTemp $archiveName
+              Invoke-WebRequest -Uri "https://dl.google.com/android/repository/$archiveName" -OutFile $archive
+              $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+              if ($hash -ne $expectedArchiveHash) { throw "SDK 压缩包 SHA-256 不符：$hash" }
+              $sdk = Join-Path $sdkTemp 'sdk'
+              Expand-Archive -LiteralPath $archive -DestinationPath $sdk
+              $jar = Join-Path $sdk 'android-36\android.jar'
+              if (-not (Test-Path -LiteralPath $jar -PathType Leaf)) { throw "找不到 $jar" }
+              $hash = (Get-FileHash -LiteralPath $jar -Algorithm SHA256).Hash.ToLowerInvariant()
+              if ($hash -ne $expectedJarHash) { throw "android.jar SHA-256 不符：$hash" }
+            }
+            pwsh -NoProfile -File .\build.ps1 -BuildTools (Join-Path $env:ANDROID_HOME 'build-tools\36.1.0') -AndroidJar $jar
+            if ($LASTEXITCODE -ne 0) { throw "APK 构建失败（退出码 $LASTEXITCODE）" }
+          } finally {
+            if ($sdkTemp -and (Test-Path -LiteralPath $sdkTemp)) {
+              Remove-Item -LiteralPath $sdkTemp -Recurse -Force
+            }
+          }
       - name: Sign the build with a one-time RSA-4096 key
         shell: pwsh
         run: |
