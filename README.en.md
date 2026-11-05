@@ -105,13 +105,47 @@ You need:
 - Windows and PowerShell 7.2 or newer (`pwsh`);
 - JDK 17 or newer (the maintainer uses Temurin 25, with `javac --release 17`): set `JAVA_HOME`, put `javac` on `PATH`, or specify it with `-JavaHome`;
 - `build-tools;36.1.0` (aapt2, aapt, d8, zipalign, apksigner) and `platforms;android-36` (`android.jar`) from the Android SDK.
-  You can install them with the SDK's own `sdkmanager "build-tools;36.1.0" "platforms;android-36"`. Set the environment variable `ANDROID_HOME` (or `ANDROID_SDK_ROOT`)
+  You can install them with the SDK's own `sdkmanager "build-tools;36.1.0" "platforms;android-36"`. Reproducing v1.0.0 requires platform r2; SDK Manager may install a newer revision.
+  Set the environment variable `ANDROID_HOME` (or `ANDROID_SDK_ROOT`)
   to the SDK root, or specify them directly with `-BuildTools` and `-AndroidJar`.
 
 No Gradle. In the repository root:
 
 ```powershell
 pwsh -NoProfile -File .\build.ps1
+```
+
+If Android 36 r2 is missing locally, or the SHA-256 of `platforms\android-36\android.jar` differs, download the pinned version from Google
+and pass the extracted file with `-AndroidJar`. CI and release verification use the same fallback; a valid preinstalled file skips the download.
+
+- Official metadata: [repository2-3.xml](https://dl.google.com/android/repository/repository2-3.xml), package `platforms;android-36`, revision `2`.
+- Official archive: [platform-36_r02.zip](https://dl.google.com/android/repository/platform-36_r02.zip) (65,878,410 bytes).
+- The metadata provides only SHA-1: `2c1a80dd4d9f7d0e6dd336ec603d9b5c55a6f576`. After checking that value, we computed and pinned the archive SHA-256:
+  `37607369a28c5b640b3a7998868d45898ebcb777565a0e85f9acf36f29631d2e`.
+- Extracted `android-36\android.jar` SHA-256: `d9eb9da824d9e247a352f570f01e1169e725b2954bca9e283a71786c59b59f9a`.
+
+Check the archive SHA-256 before extraction, then check the `android.jar` SHA-256. Either mismatch must stop the build. For example (using your local build-tools 36.1.0):
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$work = Join-Path ([IO.Path]::GetTempPath()) ("modavd-sdk-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $work | Out-Null
+try {
+    $zip = Join-Path $work 'platform-36_r02.zip'
+    Invoke-WebRequest 'https://dl.google.com/android/repository/platform-36_r02.zip' -OutFile $zip
+    if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ne '37607369a28c5b640b3a7998868d45898ebcb777565a0e85f9acf36f29631d2e') {
+        throw 'SDK archive SHA-256 mismatch'
+    }
+    Expand-Archive -LiteralPath $zip -DestinationPath $work
+    $jar = Join-Path $work 'android-36\android.jar'
+    if ((Get-FileHash -LiteralPath $jar -Algorithm SHA256).Hash -ne 'd9eb9da824d9e247a352f570f01e1169e725b2954bca9e283a71786c59b59f9a') {
+        throw 'android.jar SHA-256 mismatch'
+    }
+    pwsh -NoProfile -File .\build.ps1 -BuildTools (Join-Path $env:ANDROID_HOME 'build-tools\36.1.0') -AndroidJar $jar
+    if ($LASTEXITCODE -ne 0) { throw 'APK build failed' }
+} finally {
+    Remove-Item -LiteralPath $work -Recurse -Force
+}
 ```
 
 - It first runs the protocol self-test `ProtocolTest` on the host JVM (`-SkipTest` skips it), then builds both APKs.

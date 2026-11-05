@@ -105,13 +105,47 @@ CI（`ci.yml`）只在 Pull Request 和手动触发时跑：协议自测、在 W
 - Windows 和 PowerShell 7.2 以上（`pwsh`）；
 - JDK 17 以上（维护者用 Temurin 25，`javac --release 17`）：设 `JAVA_HOME`、把 `javac` 放进 `PATH`，或用 `-JavaHome` 指定；
 - Android SDK 的 `build-tools;36.1.0`（aapt2、aapt、d8、zipalign、apksigner）和 `platforms;android-36`（`android.jar`），
-  可以用 SDK 自带的 `sdkmanager "build-tools;36.1.0" "platforms;android-36"` 装；设环境变量 `ANDROID_HOME`（或 `ANDROID_SDK_ROOT`）
+  可以用 SDK 自带的 `sdkmanager "build-tools;36.1.0" "platforms;android-36"` 装；复现 v1.0.0 需要 platform r2，SDK Manager 可能安装更新的 revision。
+  设环境变量 `ANDROID_HOME`（或 `ANDROID_SDK_ROOT`）
   指向 SDK 根目录，或用 `-BuildTools`、`-AndroidJar` 直接指定。
 
 不用 Gradle。在仓库根目录：
 
 ```powershell
 pwsh -NoProfile -File .\build.ps1
+```
+
+本地没有 Android 36 r2，或 `platforms\android-36\android.jar` 的 SHA-256 不符时，可以从 Google 下载固定版本，
+用 `-AndroidJar` 指定解压后的文件。CI 和发版核对也用这个备用路径，预装文件校验正确时不下载。
+
+- 官方元数据：[repository2-3.xml](https://dl.google.com/android/repository/repository2-3.xml)，条目 `platforms;android-36`、revision `2`。
+- 官方压缩包：[platform-36_r02.zip](https://dl.google.com/android/repository/platform-36_r02.zip)（65,878,410 字节）。
+- 元数据只提供 SHA-1：`2c1a80dd4d9f7d0e6dd336ec603d9b5c55a6f576`；核对该值后计算并固定的压缩包 SHA-256：
+  `37607369a28c5b640b3a7998868d45898ebcb777565a0e85f9acf36f29631d2e`。
+- 解压后的 `android-36\android.jar` SHA-256：`d9eb9da824d9e247a352f570f01e1169e725b2954bca9e283a71786c59b59f9a`。
+
+先校验压缩包 SHA-256，再解压并校验 `android.jar` SHA-256；任一步失败都不能继续编译。例如（build-tools 仍用本地的 36.1.0）：
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$work = Join-Path ([IO.Path]::GetTempPath()) ("modavd-sdk-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $work | Out-Null
+try {
+    $zip = Join-Path $work 'platform-36_r02.zip'
+    Invoke-WebRequest 'https://dl.google.com/android/repository/platform-36_r02.zip' -OutFile $zip
+    if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ne '37607369a28c5b640b3a7998868d45898ebcb777565a0e85f9acf36f29631d2e') {
+        throw 'SDK archive SHA-256 mismatch'
+    }
+    Expand-Archive -LiteralPath $zip -DestinationPath $work
+    $jar = Join-Path $work 'android-36\android.jar'
+    if ((Get-FileHash -LiteralPath $jar -Algorithm SHA256).Hash -ne 'd9eb9da824d9e247a352f570f01e1169e725b2954bca9e283a71786c59b59f9a') {
+        throw 'android.jar SHA-256 mismatch'
+    }
+    pwsh -NoProfile -File .\build.ps1 -BuildTools (Join-Path $env:ANDROID_HOME 'build-tools\36.1.0') -AndroidJar $jar
+    if ($LASTEXITCODE -ne 0) { throw 'APK build failed' }
+} finally {
+    Remove-Item -LiteralPath $work -Recurse -Force
+}
 ```
 
 - 先在宿主 JVM 上跑协议自测 `ProtocolTest`（`-SkipTest` 跳过），再编两个 APK。
