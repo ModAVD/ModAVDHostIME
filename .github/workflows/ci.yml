@@ -111,6 +111,24 @@ jobs:
       - name: Scan tracked files for private data
         shell: bash
         run: python3 -B -I -X utf8 scripts/privacy.py . --allowlist scripts/privacy-allowlist.json
+      - name: Checkout ModAVD for the shared privacy scanner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ModAVD/ModAVD
+          ref: main
+          path: .modavd
+          persist-credentials: false
+          sparse-checkout: scripts/privacy.py
+          sparse-checkout-cone-mode: false
+      - name: scripts/privacy.py is ModAVD's
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! cmp -s scripts/privacy.py .modavd/scripts/privacy.py; then
+            echo "::error file=scripts/privacy.py::scripts/privacy.py differs from ModAVD/ModAVD main. The scanner is changed in ModAVD first; copy its scripts/privacy.py here byte for byte (only privacy-allowlist.json is this repository's own)."
+            exit 1
+          fi
+          echo "scripts/privacy.py is the same as ModAVD/ModAVD main $(git -C .modavd rev-parse --short HEAD)"
 
   authors:
     runs-on: ubuntu-24.04
