@@ -11,6 +11,8 @@ class RepoChecksTest(unittest.TestCase):
     def test_allowed_identities(self):
         self.assertTrue(repo_checks.identity_allowed("qiyinxi", "qiyinxi@foxmail.com"))
         self.assertTrue(repo_checks.identity_allowed("Bot", "123+bot[bot]@users.noreply.github.com"))
+        # Dependabot 的提交作者，原样照 GitHub 写的抄。
+        self.assertTrue(repo_checks.identity_allowed("dependabot[bot]", "49699333+dependabot[bot]@users.noreply.github.com"))
         self.assertTrue(repo_checks.identity_allowed("Old", "octocat@users.noreply.github.com"))
 
     def test_rejects_private_or_ai_identities(self):
