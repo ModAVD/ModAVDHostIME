@@ -93,7 +93,7 @@ CI（`ci.yml`）只在 Pull Request 和手动触发时跑：协议自测、在 W
 | `ime/` | 产品 APK：`HostImeService`（输入法服务）、`HostLink`（连接线程和写线程）、`HostProtocol`（帧编解码） |
 | `ime/test/ProtocolTest.java` | 宿主 JVM 上的协议自测，期望值照规格手写成十六进制；`build.ps1` 打包前跑，CI 也跑 |
 | `testapp/` | 测试 APK `org.modavd.ime.testapp`，不随产品分发 |
-| `docs/protocol-v1.md` | 通道协议 v1 |
+| `docs/protocol-v1.md`（中文）、`docs/protocol-v1.en.md`（英文） | 通道协议 v1 |
 | `build.ps1` | 构建脚本（Windows，pwsh 7.2 以上） |
 | `scripts/` | CI 的隐私扫描、作者检查，发版和核对脚本 |
 | `release/` | 各版本的发布说明；v1.0.0 还有预先提交的 `SHA256SUMS.txt` |

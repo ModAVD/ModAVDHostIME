@@ -93,7 +93,7 @@ The build pins Temurin 25.0.4.1+1, build-tools 36.1.0 and android-36 (it checks 
 | `ime/` | The product APK: `HostImeService` (the input method service), `HostLink` (the connection thread and the write thread), `HostProtocol` (frame encoding and decoding) |
 | `ime/test/ProtocolTest.java` | The protocol self-test on the host JVM, with the expected values hand-written in hex from the spec; `build.ps1` runs it before packaging, and CI runs it too |
 | `testapp/` | The test APK `org.modavd.ime.testapp`, not distributed with the product |
-| `docs/protocol-v1.md` | Channel protocol v1 |
+| `docs/protocol-v1.en.md` (English), `docs/protocol-v1.md` (Chinese) | Channel protocol v1 |
 | `build.ps1` | The build script (Windows, pwsh 7.2 or newer) |
 | `scripts/` | The CI privacy scan and author check, and the release and verification scripts |
 | `release/` | The release notes of each version; v1.0.0 also has a pre-committed `SHA256SUMS.txt` |
@@ -193,7 +193,7 @@ adb -s emulator-<port> shell setprop log.tag.ModAVDIme DEBUG
 
 ## Protocol
 
-The spec is in [docs/protocol-v1.md](docs/protocol-v1.md) (in Chinese). The host side is implemented in the emulator patches of [ModAVD/ModAVD](https://github.com/ModAVD/ModAVD):
+The spec is in [docs/protocol-v1.en.md](docs/protocol-v1.en.md). The host side is implemented in the emulator patches of [ModAVD/ModAVD](https://github.com/ModAVD/ModAVD):
 three patches under `patches/qemu/mas<N>/` (N ≥ 35) whose file names contain `modavd_ime`, `console-command-ime` and `host-input-method`
 (in 0.35.0 these are 0058–0060 in `patches/qemu/mas35/`). The key points:
 

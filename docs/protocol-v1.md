@@ -1,5 +1,7 @@
 # 宿主输入法通道协议 v1
 
+**简体中文** | [English](protocol-v1.en.md)
+
 ModAVD 模拟器（0.35.0 起）和客体里的输入法 `org.modavd.ime` 之间的通道。两边必须逐字节一致；
 本仓库的 `ime/src/org/modavd/ime/HostProtocol.java` 是客体侧的编解码，`ime/test/ProtocolTest.java` 按本文手写了期望字节。
 
