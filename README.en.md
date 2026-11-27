@@ -243,6 +243,7 @@ The test APK is signed with the same key as the product APK. It is for testing o
 - The README comes in two versions, Chinese (`README.md`) and English (`README.en.md`), which match section by section. If you change one, change the other in the same PR. If you can write only one language, say so in the PR and the maintainer will fill in the other.
 - The other conventions (attribution, license, AI tools, how to report security issues) are the same as ModAVD's; see ModAVD's
   [CONTRIBUTING.md](https://github.com/ModAVD/ModAVD/blob/main/CONTRIBUTING.en.md).
+- The rules for AI coding tools are in [AGENTS.en.md](AGENTS.en.md) (Chinese: [AGENTS.md](AGENTS.md)).
 - For the environment, hardware, how to verify, and suggested models when you use AI tools, see [Develop: the host IME](https://modavd.github.io/en/develop/ime) on the documentation site.
 
 ## License

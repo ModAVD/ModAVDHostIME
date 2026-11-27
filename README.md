@@ -243,6 +243,7 @@ am start -n org.modavd.ime.testapp/.MainActivity [--es focus text|password|raw] 
 - README 有中文（`README.md`）和英文（`README.en.md`）两份，逐节对应：改了一份，就在同一个 PR 里把另一份也改了；只会写一种语言的，在 PR 里说一声，由维护者补上。
 - 其余约定（署名、许可、AI 工具、安全问题怎么报）和 ModAVD 一样，见 ModAVD 的
   [CONTRIBUTING.md](https://github.com/ModAVD/ModAVD/blob/main/CONTRIBUTING.md)。
+- 给 AI 编码工具的规矩在 [AGENTS.md](AGENTS.md)（英文版 [AGENTS.en.md](AGENTS.en.md)）。
 - 环境、硬件、怎么验证和用 AI 工具时的模型建议，见文档站的[开发：宿主输入法](https://modavd.github.io/develop/ime)。
 
 ## 许可证

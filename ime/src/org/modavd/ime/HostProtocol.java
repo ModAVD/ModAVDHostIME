@@ -20,50 +20,52 @@ import java.net.ProtocolException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 通道协议 v1 的编解码，宿主侧（模拟器的 modavd_ime pipe 服务）和这里逐字节一致。
+ * Encoding and decoding of channel protocol v1. The host side (the emulator's modavd_ime pipe service)
+ * matches this byte for byte.
  *
- * <p>帧 = 4 字节小端无符号负载长度 N（1 ≤ N ≤ 65536）+ N 字节负载；负载第 1 字节是类型字母，整数一律小端，
- * 文本一律 UTF-8、不带结尾 \0、占满负载剩余部分。
+ * <p>A frame is a 4-byte little-endian unsigned payload length N (1 <= N <= 65536) followed by N bytes
+ * of payload. The first byte of the payload is the type letter; integers are always little-endian;
+ * text is always UTF-8, has no trailing \0, and fills the rest of the payload.
  *
- * <p>只用 JDK 的类，宿主 JVM 上的 ProtocolTest 直接测这个类。
+ * <p>It uses only JDK classes, so ProtocolTest on the host JVM tests this class directly.
  */
 final class HostProtocol {
     static final int VERSION = 1;
     static final String DEVICE = "/dev/goldfish_pipe_dprctd";
-    /** 打开设备后先写的服务名：ASCII "pipe:modavd_ime" 再加 1 个 \0。 */
+    /** The service name written first after opening the device: ASCII "pipe:modavd_ime" plus one \0. */
     static final byte[] CONNECT = "pipe:modavd_ime\0".getBytes(StandardCharsets.US_ASCII);
     static final int HEADER_SIZE = 4;
     static final int MAX_PAYLOAD = 65536;
 
-    /** 两个方向都有：握手（客体先发）/ 握手回应。 */
+    /** Used in both directions: the handshake (the guest sends first) and the handshake reply. */
     static final byte HELLO = 'V';
-    // 客体 → 宿主
+    // guest -> host
     static final byte FOCUS = 'F';
     static final byte CURSOR = 'R';
-    // 宿主 → 客体
+    // host -> guest
     static final byte COMMIT = 'C';
     static final byte PREEDIT = 'P';
     static final byte FINISH = 'E';
     static final byte KEY = 'K';
     static final byte DELETE = 'D';
 
-    /** K 帧的 action。 */
+    /** The action of a K frame. */
     static final int KEY_DOWN = 0;
     static final int KEY_UP = 1;
     static final int KEY_DOWN_UP = 2;
 
     private HostProtocol() {}
 
-    /** 宿主发来的一帧。 */
+    /** One frame from the host. */
     static final class Command {
         final byte type;
-        /** V：协议版本；P：组字串里的光标；K：keycode；D：before。 */
+        /** V: protocol version; P: cursor in the composing text; K: keycode; D: before. */
         final int arg0;
-        /** K：metaState；D：after。 */
+        /** K: metaState; D: after. */
         final int arg1;
-        /** K：action。 */
+        /** K: action. */
         final int arg2;
-        /** C / P 的文本，其余为 null。 */
+        /** The text of C / P; null for the others. */
         final String text;
 
         Command(byte type, int arg0, int arg1, int arg2, String text) {
@@ -74,7 +76,7 @@ final class HostProtocol {
             this.text = text;
         }
 
-        /** 日志用；不带文本内容（可能是密码），只给长度。 */
+        /** For logs. It does not include the text (it may be a password), only the length. */
         @Override
         public String toString() {
             switch (type) {
@@ -89,16 +91,16 @@ final class HostProtocol {
         }
     }
 
-    // ---- 客体 → 宿主 ----
+    // ---- guest -> host ----
 
-    /** V：u32 协议版本。 */
+    /** V: u32 protocol version. */
     static byte[] hello() {
         byte[] f = frame(HELLO, 4);
         putInt(f, 5, VERSION);
         return f;
     }
 
-    /** F：u8 active、u32 inputType、u32 imeOptions。 */
+    /** F: u8 active, u32 inputType, u32 imeOptions. */
     static byte[] focus(boolean active, int inputType, int imeOptions) {
         byte[] f = frame(FOCUS, 9);
         f[5] = (byte) (active ? 1 : 0);
@@ -107,7 +109,7 @@ final class HostProtocol {
         return f;
     }
 
-    /** R：i32 left、top、right、bottom（客体 0 号屏的物理像素）。 */
+    /** R: i32 left, top, right, bottom (physical pixels of the guest's display 0). */
     static byte[] cursor(int left, int top, int right, int bottom) {
         byte[] f = frame(CURSOR, 16);
         putInt(f, 5, left);
@@ -117,7 +119,7 @@ final class HostProtocol {
         return f;
     }
 
-    /** 帧头 + 类型字节，字段留给调用方填；负载从下标 4 开始，字段从下标 5 开始。 */
+    /** Frame header + type byte; the caller fills in the fields. The payload starts at index 4 and the fields at index 5. */
     private static byte[] frame(byte type, int fieldBytes) {
         byte[] f = new byte[HEADER_SIZE + 1 + fieldBytes];
         putInt(f, 0, 1 + fieldBytes);
@@ -125,7 +127,7 @@ final class HostProtocol {
         return f;
     }
 
-    /** 日志用：一个已编码的客体帧的简述。 */
+    /** For logs: a short description of an encoded guest frame. */
     static String describe(byte[] frame) {
         if (frame.length <= HEADER_SIZE) return "?";
         switch (frame[HEADER_SIZE]) {
@@ -138,9 +140,9 @@ final class HostProtocol {
         }
     }
 
-    // ---- 宿主 → 客体 ----
+    // ---- host -> guest ----
 
-    /** 解析帧头里的负载长度；不在 1..65536 内就是协议错误。 */
+    /** Parses the payload length in the frame header; a length outside 1..65536 is a protocol error. */
     static int payloadLength(byte[] header) throws ProtocolException {
         long n = getInt(header, 0) & 0xffffffffL;
         if (n < 1 || n > MAX_PAYLOAD) throw new ProtocolException("bad frame length " + n);
@@ -148,8 +150,9 @@ final class HostProtocol {
     }
 
     /**
-     * 解析一帧负载。类型未知（含只该客体发的 F、R）或字段不足都是协议错误；固定长度字段之后多出的字节忽略。
-     * K 的 action 不在 0..2 时照样返回，由调用方忽略。
+     * Parses one frame payload. An unknown type (including F and R, which only the guest sends) or missing
+     * fields is a protocol error; bytes after the fixed-length fields are ignored.
+     * A K frame whose action is not in 0..2 is still returned, and the caller ignores it.
      */
     static Command parse(byte[] p) throws ProtocolException {
         if (p.length < 1) throw new ProtocolException("empty payload");
@@ -179,14 +182,14 @@ final class HostProtocol {
         }
     }
 
-    /** 类型字节之后至少要有 fieldBytes 个字节。 */
+    /** There must be at least fieldBytes bytes after the type byte. */
     private static void need(byte[] p, int fieldBytes) throws ProtocolException {
         if (p.length < 1 + fieldBytes) {
             throw new ProtocolException("short '" + (char) p[0] + "' frame: " + p.length + " bytes");
         }
     }
 
-    /** 坏的 UTF-8 序列换成 U+FFFD，不抛异常。 */
+    /** Malformed UTF-8 sequences become U+FFFD; nothing is thrown. */
     private static String utf8(byte[] p, int from) {
         return new String(p, from, p.length - from, StandardCharsets.UTF_8);
     }
