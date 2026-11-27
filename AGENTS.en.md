@@ -21,7 +21,7 @@ AI tools working in this repository (Codex, Claude Code and others) read this fi
 - The signing, checksum and release flow of the official APK must not be changed to download things from the network or to generate an official key. The official signing key is read only from the maintainer's private path; do not copy it into the repository or a test directory, and it never goes into CI.
 - Never put keys into git: `out/`, `*.p12` and `*.pass` are all in `.gitignore`.
 - Workflows: pin third-party actions to a full 40-character commit SHA, do not use `pull_request_target`, and do not use self-hosted runners.
-- For a change users can see (the behaviour of the APK changes), add a file `changelog.d/<name>.<feat|fix|change|remove>.md` in the same PR; changes that only touch development, tests, CI or documentation need none.
+- For a change users can see (the behaviour of the APK changes), add a file `changelog.d/<name>.<feat|fix|change|remove>.md` in the same PR, with two lines: Chinese, then English; changes that only touch development, tests, CI or documentation need none.
 - Name the issue on a line of its own in the PR description, `Refs ModAVD/ModAVD#<number>`, and do not write `Fixes` or `Closes` (issues are all opened in the ModAVD repository).
 
 ## Which language to write in

@@ -21,7 +21,7 @@
 - 正式 APK 的签名、摘要和发布流程不能改成联网下载或自动生成正式密钥。正式签名密钥只从维护者私有路径读取，不复制到仓库或测试目录，也不进 CI。
 - 不把密钥放进 git：`out/`、`*.p12`、`*.pass` 都在 `.gitignore` 里。
 - workflow：第三方 action 钉到 40 位提交 SHA，不用 `pull_request_target`，不用自托管 runner。
-- 用户看得见的改动（APK 的行为变了），同一个 PR 里加一个 `changelog.d/<名字>.<feat|fix|change|remove>.md`；只动开发、测试、CI、文档的不加。
+- 用户看得见的改动（APK 的行为变了），同一个 PR 里加一个 `changelog.d/<名字>.<feat|fix|change|remove>.md`，两行：先中文、再英文；只动开发、测试、CI、文档的不加。
 - 对应的 issue 在 PR 正文里单独写一行 `Refs ModAVD/ModAVD#<编号>`，不写 `Fixes`、`Closes`（issue 都开在 ModAVD 仓库）。
 
 ## 用什么语言写
