@@ -34,18 +34,18 @@ $PSNativeCommandUseErrorActionPreference = $false
 # 参数用数组传：-encoding、-storepass:file 这类写法原样交给外部程序；输出直接显示，不混进函数返回值
 function Invoke-Tool([string]$Exe, [string[]]$ArgList) {
     & $Exe @ArgList | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "$([IO.Path]::GetFileName($Exe)) 失败（退出码 $LASTEXITCODE） / See the message above in English." }
+    if ($LASTEXITCODE -ne 0) { throw "$([IO.Path]::GetFileName($Exe)) 失败（退出码 $LASTEXITCODE） / failed (exit code $LASTEXITCODE)" }
 }
 
 function Find-File([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "找不到 $Path / See the message above in English." }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "找不到 $Path / not found: $Path" }
     return $Path
 }
 
 # ---- 工具链 ----
 if (-not $BuildTools -or -not $AndroidJar) {
     $sdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else {
-        throw '找不到 Android SDK：设 ANDROID_HOME 或 ANDROID_SDK_ROOT，或直接指定工具路径 / Android SDK not found: set ANDROID_HOME or ANDROID_SDK_ROOT, or pass the tool paths directly.'
+        throw '找不到 Android SDK：设环境变量 ANDROID_HOME（或 ANDROID_SDK_ROOT）指向 SDK 根目录，或用 -BuildTools、-AndroidJar 直接指定 / Android SDK not found: set ANDROID_HOME (or ANDROID_SDK_ROOT) to the SDK root, or pass -BuildTools and -AndroidJar.'
     }
     $missing = @()
     if (-not $BuildTools) {
@@ -56,7 +56,7 @@ if (-not $BuildTools -or -not $AndroidJar) {
         $AndroidJar = Join-Path $sdkRoot 'platforms\android-36\android.jar'
         if (-not (Test-Path -LiteralPath $AndroidJar -PathType Leaf)) { $missing += '"platforms;android-36"' }
     }
-    if ($missing) { throw "SDK $sdkRoot 里缺 $($missing -join '、')：用 sdkmanager $($missing -join ' ') 装上，或用 -BuildTools、-AndroidJar 指定 / See the message above in English." }
+    if ($missing) { throw "SDK $sdkRoot 里缺 $($missing -join '、')：用 sdkmanager $($missing -join ' ') 装上，或用 -BuildTools、-AndroidJar 指定 / SDK $sdkRoot is missing $($missing -join ', '): install with sdkmanager $($missing -join ' '), or pass -BuildTools and -AndroidJar." }
 }
 $aapt2 = Find-File (Join-Path $BuildTools 'aapt2.exe')
 $aapt = Find-File (Join-Path $BuildTools 'aapt.exe')
@@ -69,7 +69,7 @@ if (-not $JavaHome) {
         $JavaHome = $env:JAVA_HOME
     } else {
         $javacCmd = Get-Command javac.exe -ErrorAction SilentlyContinue
-        if (-not $javacCmd) { throw '找不到 Android SDK：设 ANDROID_HOME 或 ANDROID_SDK_ROOT，或直接指定工具路径 / Android SDK not found: set ANDROID_HOME or ANDROID_SDK_ROOT, or pass the tool paths directly.' }
+        if (-not $javacCmd) { throw '找不到 JDK：设 JAVA_HOME、把 javac 放进 PATH，或用 -JavaHome 指定 / JDK not found: set JAVA_HOME, put javac on PATH, or pass -JavaHome.' }
         $JavaHome = Split-Path (Split-Path $javacCmd.Source)
     }
 }
@@ -77,7 +77,7 @@ $javac = Find-File (Join-Path $JavaHome 'bin\javac.exe')
 $java = Find-File (Join-Path $JavaHome 'bin\java.exe')
 $keytool = Find-File (Join-Path $JavaHome 'bin\keytool.exe')
 $javacVersion = (& $javac -version 2>&1 | Out-String).Trim()
-if ($javacVersion -notmatch '^javac (\d+)' -or [int]$Matches[1] -lt 17) { throw "需要 JDK 17 以上，现在是：$javacVersion / See the message above in English." }
+if ($javacVersion -notmatch '^javac (\d+)' -or [int]$Matches[1] -lt 17) { throw "需要 JDK 17 以上，现在是：$javacVersion / JDK 17 or newer is required, found: $javacVersion" }
 # d8.bat、apksigner.bat 靠 JAVA_HOME 找 java
 $env:JAVA_HOME = $JavaHome
 
@@ -100,7 +100,7 @@ if (-not (Test-Path -LiteralPath $KeyStore)) {
         '-dname', 'CN=ModAVD IME Dev, O=qiyinxi', '-storepass:file', $KeyPassFile, '-keypass:file', $KeyPassFile)
     Write-Host "已生成开发签名密钥：$KeyStore（口令在 $KeyPassFile）"
 } elseif (-not (Test-Path -LiteralPath $KeyPassFile)) {
-    throw "找不到密钥库口令文件 $KeyPassFile（用 -KeyPassFile 指定） / See the message above in English."
+    throw "找不到密钥库口令文件 $KeyPassFile（用 -KeyPassFile 指定） / key store password file not found: $KeyPassFile (pass -KeyPassFile)"
 }
 
 # ---- 协议自测（宿主 JVM） ----
@@ -172,5 +172,3 @@ foreach ($apk in $apks) {
         ForEach-Object { Write-Host "  $_" }
 }
 $sums | ForEach-Object { Write-Host $_ }
-
-

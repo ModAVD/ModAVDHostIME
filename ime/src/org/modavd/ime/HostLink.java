@@ -27,34 +27,37 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 
 /**
- * 和模拟器 modavd_ime pipe 服务的连接。
+ * The connection to the emulator's modavd_ime pipe service.
  *
- * <p>读线程负责打开管道、握手、阻塞读帧；失败或断开后关 fd，按 1 s、2 s、4 s…封顶 30 s 退避重连，
- * 连上后立刻补发当前焦点和光标。写全部交给单线程执行器串行做，主线程从不阻塞。宿主发来的命令切回主线程交给
- * {@link Listener}。
+ * <p>The read thread opens the pipe, does the handshake and blocks reading frames. After a failure or
+ * a disconnect it closes the fd and reconnects with backoff (1 s, 2 s, 4 s ... capped at 30 s); once
+ * connected it sends the current focus and cursor again. All writes go through a single-thread executor
+ * one after another, so the main thread never blocks. Commands from the host are posted back to the
+ * main thread and handed to {@link Listener}.
  *
- * <p>管道用 RandomAccessFile 打开：Android 的 RandomAccessFile.close() 会给阻塞在这个 fd 上的线程发信号，
- * 读线程的 read 因此抛异常返回，stop() 才停得下来（单纯 close(2) 叫不醒阻塞在 goldfish pipe 上的 read）。
+ * <p>The pipe is opened with RandomAccessFile: on Android, RandomAccessFile.close() signals the threads
+ * blocked on this fd, so the read in the read thread throws and returns, and stop() can finish. A plain
+ * close(2) does not wake a read blocked on a goldfish pipe.
  */
 final class HostLink {
     interface Listener {
-        /** 在主线程调用。 */
+        /** Called on the main thread. */
         void onHostCommand(HostProtocol.Command command);
     }
 
     private static final String TAG = HostImeService.TAG;
     private static final long FIRST_RETRY_MS = 1000;
     private static final long MAX_RETRY_MS = 30000;
-    /** 连续失败超过这么多次后（已到 30 s 封顶），同样的错误每隔这么多次才记一行，旧模拟器上不一直刷日志。 */
+    /** After this many failures in a row (the backoff has reached its 30 s cap), the same error is logged only once per QUIET_EVERY failures, so an old emulator does not flood the log. */
     private static final int QUIET_AFTER = 6;
     private static final int QUIET_EVERY = 20;
 
-    /** 要告诉宿主的当前状态，只在主线程替换，写线程重连时整份读。 */
+    /** The current state to tell the host. Replaced only on the main thread; the write thread reads all of it when it reconnects. */
     private static final class State {
         final boolean active;
         final int inputType;
         final int imeOptions;
-        /** 最近一次的 R（left, top, right, bottom），没有就是 null。 */
+        /** The latest R (left, top, right, bottom), or null if there is none. */
         final int[] cursor;
 
         State(boolean active, int inputType, int imeOptions, int[] cursor) {
@@ -75,7 +78,7 @@ final class HostLink {
     private final Thread reader = new Thread(this::readLoop, "ModAVDIme-read");
     private final Object lock = new Object();
     private volatile boolean stopped;
-    /** 已打开并发过握手的管道；只在持 lock 时赋值。 */
+    /** The pipe that is open and has sent the handshake; assigned only while holding lock. */
     private volatile RandomAccessFile pipe;
     private volatile State state = new State(false, 0, 0, null);
 
@@ -89,7 +92,7 @@ final class HostLink {
         reader.start();
     }
 
-    /** 服务销毁时调用：告诉宿主焦点没了，关管道，停掉两个线程。 */
+    /** Called when the service is destroyed: tell the host the focus is gone, close the pipe and stop both threads. */
     void stop() {
         RandomAccessFile p;
         synchronized (lock) {
@@ -107,13 +110,13 @@ final class HostLink {
         reader.interrupt();
     }
 
-    /** 主线程：onStartInput / onFinishInput。换了编辑框，旧的光标位置作废。 */
+    /** Main thread: onStartInput / onFinishInput. When the edit field changes, the old cursor position is dropped. */
     void setFocus(boolean active, int inputType, int imeOptions) {
         state = new State(active, inputType, imeOptions, null);
         send(HostProtocol.focus(active, inputType, imeOptions));
     }
 
-    /** 主线程：光标位置，和上次相同就不发。 */
+    /** Main thread: the cursor position; it is not sent again if it is the same as last time. */
     void setCursor(int left, int top, int right, int bottom) {
         State s = state;
         int[] rect = {left, top, right, bottom};
@@ -132,7 +135,7 @@ final class HostLink {
             String error = null;
             try {
                 p = new RandomAccessFile(HostProtocol.DEVICE, "rw");
-                // 服务名和 V 分两次写：宿主的连接器只吃到 \0 为止
+                // Write the service name and V separately: the host connector reads only up to the \0
                 p.write(HostProtocol.CONNECT);
                 p.write(HostProtocol.hello());
                 synchronized (lock) {
@@ -182,14 +185,14 @@ final class HostLink {
             try {
                 Thread.sleep(retryMs);
             } catch (InterruptedException e) {
-                // stop() 打断睡眠，回到循环开头退出
+                // stop() interrupted the sleep; go back to the top of the loop and exit
             }
             retryMs = Math.min(retryMs * 2, MAX_RETRY_MS);
         }
         Log.i(TAG, "pipe thread stopped");
     }
 
-    /** 写线程：刚连上时补发当前 F（以及有的话 R）。 */
+    /** Write thread: right after connecting, send the current F again (and R if there is one). */
     private void resendState() {
         RandomAccessFile p = pipe;
         if (p == null) return;
@@ -198,7 +201,7 @@ final class HostLink {
         if (s.cursor != null) write(p, HostProtocol.cursor(s.cursor[0], s.cursor[1], s.cursor[2], s.cursor[3]));
     }
 
-    /** 没连上时直接丢掉：连上后 resendState 会补发最新状态。 */
+    /** Dropped while not connected: resendState sends the latest state after connecting. */
     private void send(byte[] frame) {
         submit(() -> {
             RandomAccessFile p = pipe;
@@ -210,11 +213,11 @@ final class HostLink {
         try {
             writer.execute(task);
         } catch (RejectedExecutionException e) {
-            // 已经 stop()
+            // stop() has already been called
         }
     }
 
-    /** 写线程。写失败就关管道，读线程会在 read 上看到并去重连。 */
+    /** Write thread. If a write fails, close the pipe; the read thread sees it on read and reconnects. */
     private void write(RandomAccessFile p, byte[] frame) {
         try {
             p.write(frame);
@@ -230,7 +233,7 @@ final class HostLink {
         try {
             p.close();
         } catch (IOException e) {
-            // 已经断了，没什么可做
+            // Already disconnected; nothing to do
         }
     }
 

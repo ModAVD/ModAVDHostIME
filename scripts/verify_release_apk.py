@@ -76,7 +76,7 @@ def compare_apks(built_signed: bytes, release: bytes) -> None:
     built_block_length = built_layout.block_end - built_layout.block_start
     release_block_length = release_layout.block_end - release_layout.block_start
     if built_block_length != release_block_length or built_block_length != 8192:
-        raise ValueError("RSA-4096 签名块长度不是双方相同的 8192 字节 / RSA-4096 signing block does not have two equal 8192-byte lengths")
+        raise ValueError("RSA-4096 签名块长度不是双方相同的 8192 字节 / the RSA-4096 signing block is not 8192 bytes on both sides")
     if built_signed[:built_layout.block_start] != release[:release_layout.block_start]:
         raise ValueError("签名块之前的 APK 条目字节不同 / APK entry bytes before the signing block differ")
     if normalized_central_and_eocd(built_signed, built_layout) != normalized_central_and_eocd(release, release_layout):
